@@ -1,0 +1,30 @@
+{
+    "adb": {
+        "executable_path": "E:/MuMu Player 12/nx_device/12.0/shell/adb.exe",
+        "timeout_seconds": 30,
+        "auto_reconnect": true,
+        "health_check_interval": 10,
+        "muMu_default_port": 7555,
+        "nox_default_port": 62001,
+        "ldplayer_default_port": 5555,
+        "bluestacks_default_port": 5555
+    },
+    "emulator": {
+        "scan_common_ports": true,
+        "custom_ports": "16384,7555,62001",
+        "connection_mode": "wireless"
+    },
+    "ui": {
+        "theme": "dark",
+        "preview_fps": 15,
+        "show_fps_counter": true,
+        "log_level": "INFO",
+        "auto_connect_on_startup": false
+    },
+    "advanced": {
+        "enable_anti_detection": true,
+        "min_operation_interval_ms": 50,
+        "screenshot_compression_quality": 95,
+        "max_buffer_size": 10
+    }
+}
