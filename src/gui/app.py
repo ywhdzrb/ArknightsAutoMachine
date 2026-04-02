@@ -64,20 +64,38 @@ class AAMApplication:
         logger.info(f"{self.APP_NAME} v{self.VERSION} 启动中...")
     
     def _setup_logging(self) -> None:
-        """配置应用级日志系统"""
+        """配置应用级日志系统 - 同时输出到控制台、文件和GUI"""
         log_format = "%(asctime)s | %(levelname)-7s | %(name)-25s | %(message)s"
         date_format = "%H:%M:%S"
 
-        logging.basicConfig(
-            level=logging.INFO,
-            format=log_format,
-            datefmt=date_format,
-            handlers=[
-                logging.StreamHandler(sys.stdout),
-            ]
-        )
+        # 创建日志目录
+        log_dir = Path(__file__).parent.parent.parent / "logs"
+        log_dir.mkdir(exist_ok=True)
 
-        logging.getLogger().setLevel(logging.DEBUG)
+        # 生成日志文件名（包含日期和时间，避免覆盖）
+        from datetime import datetime
+        log_file = log_dir / f"aam_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+        # 配置根日志记录器
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+
+        # 清除现有处理器
+        root_logger.handlers.clear()
+
+        # 控制台处理器
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(logging.Formatter(log_format, date_format))
+        root_logger.addHandler(console_handler)
+
+        # 文件处理器
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(log_format, date_format))
+        root_logger.addHandler(file_handler)
+
+        logger.info(f"日志已配置 | 控制台级别: INFO | 文件级别: DEBUG | 日志文件: {log_file}")
 
     def _get_adb_path(self) -> str:
         """从设置文件加载ADB路径"""
@@ -314,11 +332,21 @@ class AAMApplication:
             self._root.after(0, lambda: self._device_status_label.config(text=message))
     
     def log_message(self, level: str, message: str) -> None:
-        """发送消息到监控面板的日志区域"""
+        """发送消息到日志系统（控制台、文件、GUI）
+
+        Args:
+            level: 日志级别 (DEBUG/INFO/WARNING/ERROR)
+            message: 日志消息
+        """
+        # 同时输出到标准日志系统
+        log_level = getattr(logging, level.upper(), logging.INFO)
+        logger.log(log_level, message)
+
+        # 发送到GUI监控面板
         if 'monitor' in self._panels:
             monitor = self._panels['monitor']
             if hasattr(monitor, 'add_log'):
-                self._root.after(0, lambda: monitor.add_log(level, message))
+                self._root.after(0, lambda lvl=level, msg=message: monitor.add_log(lvl, msg))
     
     def _handle_device_connect(self, device_info) -> None:
         """处理设备连接请求"""
@@ -336,41 +364,90 @@ class AAMApplication:
                 device = self._adb_client.connect_device(
                     target=device_info.serial if hasattr(device_info, 'serial') else device_info
                 )
-                
-                from AMA.L0.bridge import L0Bridge
-                
-                self._bridge = L0Bridge(
-                    adb_client=self._adb_client,
-                    device_serial=device.serial,
-                )
-                
+
+                # 加载截图设置
+                capture_settings = self._load_capture_settings()
+                capture_method = capture_settings.get("method", "auto")
+
+                # 根据设置选择桥接器类型
+                if capture_method in ["windows", "scrcpy"]:
+                    # 使用 HybridL0Bridge 支持 Windows 截图或 Scrcpy
+                    from AMA.L0.hybrid_bridge import HybridL0Bridge, HybridBridgeConfig, CaptureBackend
+
+                    if capture_method == "windows":
+                        preferred_backend = CaptureBackend.WINDOWS
+                        backend_name = "Windows截图"
+                    else:  # scrcpy
+                        preferred_backend = CaptureBackend.SCRCPY
+                        backend_name = "Scrcpy截图"
+
+                    config = HybridBridgeConfig(
+                        preferred_backend=preferred_backend,
+                        emulator_window_title=capture_settings.get("window_title"),
+                        windows_specific_method=capture_settings.get("windows_specific_method", "auto"),
+                    )
+
+                    self._bridge = HybridL0Bridge(
+                        adb_client=self._adb_client,
+                        device_serial=device.serial,
+                        config=config,
+                    )
+                    logger.info(f"使用{backend_name}方式 | 目标窗口: {config.emulator_window_title or '自动检测'} | 捕捉方式: {config.windows_specific_method}")
+                else:
+                    # 使用标准 ADB 截图或自动检测
+                    from AMA.L0.bridge import L0Bridge
+
+                    self._bridge = L0Bridge(
+                        adb_client=self._adb_client,
+                        device_serial=device.serial,
+                    )
+                    logger.info(f"使用标准ADB截图方式 | 方法: {capture_method}")
+
                 self._bridge.initialize()
-                
+
                 self.update_status(f"已连接: {device.display_name}")
                 self.update_device_status(f"{device.model} | {device.resolution[0]}x{device.resolution[1]}")
-                
+
                 self.log_message("INFO", f"设备连接成功: {device.display_name}")
-                
+
                 preview_panel = self._panels.get('preview')
                 if preview_panel and self._bridge:
                     preview_panel.set_bridge(self._bridge)
-                    
+
                 monitor_panel = self._panels.get('monitor')
                 if monitor_panel and self._bridge:
                     monitor_panel.set_bridge(self._bridge)
-                
+
                 control_panel = self._panels.get('control')
                 if control_panel:
                     control_panel.on_connected(device)
-                    
+
             except Exception as e:
                 error_msg = f"连接失败: {e}"
                 self.log_message("ERROR", error_msg)
                 self.update_status(error_msg)
-                
-                self._root.after(0, lambda: messagebox.showerror("连接错误", str(e)))
-        
+
+                self._root.after(0, lambda err=str(e): messagebox.showerror("连接错误", err))
+
         threading.Thread(target=connect_task, daemon=True).start()
+
+    def _load_capture_settings(self) -> dict:
+        """加载截图设置"""
+        try:
+            import json
+            settings_file = Path(__file__).parent.parent.parent / "config" / "user_settings.json"
+            logger.info(f"正在加载设置文件: {settings_file}")
+            if settings_file.exists():
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    capture_settings = settings.get("capture", {})
+                    logger.info(f"加载的截图设置: {capture_settings}")
+                    return capture_settings
+            else:
+                logger.warning(f"设置文件不存在: {settings_file}")
+        except Exception as e:
+            logger.error(f"无法加载截图设置: {e}")
+        return {}
     
     def _handle_device_disconnect(self) -> None:
         """处理设备断开请求"""
@@ -486,28 +563,98 @@ class AAMApplication:
     def _on_settings(self) -> None:
         """打开设置对话框"""
         from .dialogs.settings import SettingsDialog
+
+        def on_settings_saved(settings):
+            """设置保存后的回调 - 刷新预览设置并重新初始化设备连接"""
+            # 刷新预览面板设置（帧率、裁剪等）
+            preview_panel = self._panels.get('preview')
+            if preview_panel and hasattr(preview_panel, 'refresh_settings'):
+                preview_panel.refresh_settings()
+                logger.info("预览设置已刷新")
+            
+            # 如果已连接设备，重新初始化以应用新设置
+            if self._bridge and self._bridge.is_ready:
+                logger.info("设置已更改，正在重新初始化设备连接...")
+                # 保存当前设备信息
+                device_serial = self._bridge._device_serial if hasattr(self._bridge, '_device_serial') else None
+                if device_serial:
+                    # 断开当前连接
+                    try:
+                        self._bridge.shutdown()
+                    except Exception as e:
+                        logger.debug(f"关闭旧连接时出错: {e}")
+                    self._bridge = None
+
+                    # 重新连接以应用新设置
+                    self._root.after(100, lambda: self._reconnect_device(device_serial))
+
         if self._root:
-            SettingsDialog(self._root)
+            dialog = SettingsDialog(self._root, on_save_callback=on_settings_saved)
+            dialog.wait_window()
+
+    def _reconnect_device(self, device_serial: str) -> None:
+        """重新连接设备（用于应用新设置）"""
+        logger.info(f"正在使用新设置重新连接设备: {device_serial}")
+        # 创建设备信息对象
+        class DeviceInfo:
+            pass
+        device_info = DeviceInfo()
+        device_info.serial = device_serial
+        self._handle_device_connect(device_info)
     
     def _on_quit(self) -> None:
-        """退出应用程序"""
+        """退出应用程序 - 优化版，避免阻塞"""
         if self._is_closing:
             return
         
         self._is_closing = True
+        logger.info("正在关闭应用程序...")
         
-        try:
-            self._handle_device_disconnect()
-            
-            if self._adb_client:
-                self._adb_client.shutdown()
-                self._adb_client = None
+        # 在后台线程执行清理，避免阻塞主线程
+        def cleanup_task():
+            try:
+                # 停止预览面板
+                preview_panel = self._panels.get('preview')
+                if preview_panel and hasattr(preview_panel, 'stop'):
+                    preview_panel.stop()
                 
-        except Exception as e:
-            logger.error(f"关闭过程异常: {e}")
+                # 断开设备连接（带超时）
+                if self._bridge:
+                    try:
+                        self._bridge.shutdown()
+                    except Exception as e:
+                        logger.debug(f"关闭bridge时出错: {e}")
+                    finally:
+                        self._bridge = None
+                
+                # 关闭ADB客户端
+                if self._adb_client:
+                    try:
+                        self._adb_client.shutdown()
+                    except Exception as e:
+                        logger.debug(f"关闭adb_client时出错: {e}")
+                    finally:
+                        self._adb_client = None
+                        
+            except Exception as e:
+                logger.error(f"关闭过程异常: {e}")
+            finally:
+                # 确保在主线程销毁窗口
+                if self._root:
+                    self._root.after(0, self._root.destroy)
         
-        if self._root:
-            self._root.destroy()
+        # 启动清理线程
+        import threading
+        cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
+        cleanup_thread.start()
+        
+        # 设置超时，强制关闭
+        def force_quit():
+            if self._root:
+                logger.warning("强制关闭窗口")
+                self._root.destroy()
+        
+        self._root.after(3000, force_quit)  # 3秒后强制关闭
     
     def run(self) -> None:
         """启动应用程序主循环"""

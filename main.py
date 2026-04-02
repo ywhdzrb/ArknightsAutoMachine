@@ -69,8 +69,8 @@ def setup_logging(log_level: str = "INFO") -> None:
     log_dir.mkdir(exist_ok=True)
     
     from datetime import datetime
-    
-    timestamp = datetime.now().strftime("%Y%m%d")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"aam_{timestamp}.log"
     
     console_format = (

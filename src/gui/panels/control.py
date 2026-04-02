@@ -118,7 +118,7 @@ class ControlPanel(ttk.LabelFrame):
         manual_connect_frame = ttk.LabelFrame(device_frame, text="手动连接", padding=5)
         self._manual_connect_frame = manual_connect_frame
 
-        self._manual_addr_var = tk.StringVar(value="192.168.0.110:5555")
+        self._manual_addr_var = tk.StringVar(value="127.0.0.1:5555")
         self._manual_addr_entry = ttk.Entry(
             manual_connect_frame,
             textvariable=self._manual_addr_var,

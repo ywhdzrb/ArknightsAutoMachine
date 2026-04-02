@@ -499,30 +499,26 @@ class AdbSensor:
             return stats
     
     def _capture_loop(self) -> None:
-        """主采集循环（在独立线程中运行）
+        """主采集循环（在独立线程中运行）- 优化版
         
-        循环逻辑:
-        1. 等待pause信号（暂停时阻塞在此）
-        2. 计算帧间隔控制（根据target_fps）
-        3. 调用_capture_single_frame()获取一帧
-        4. 成功 → 处理帧数据并放入缓冲区
-        5. 失败 → 记录错误，判断是否需要触发重连
-        6. 检查stop信号，若收到则退出循环
-        
-        异常处理策略:
-        - 单次截图失败: 计入失败计数，继续下一帧
-        - 连续失败达到阈值: 触发自动重连或进入ERROR状态
-        - 未预期异常: 记录日志并通过error callback通知上层
+        优化策略:
+        - 截图完成后立即开始下一次，减少空闲等待
+        - 通过FPS控制每秒钟创建多少次截图线程
+        - 使用自适应间隔动态调整
         """
-        frame_interval = 1.0 / max(self._config.target_fps, 1.0)
+        target_fps = max(self._config.target_fps, 1.0)
+        target_interval = 1.0 / target_fps
         min_interval = self.MIN_FRAME_INTERVAL_MS / 1000.0
-        max_interval = self.MAX_FRAME_INTERVAL_MS / 1000.0
-        actual_interval = max(min(frame_interval, max_interval), min_interval)
         
         logger.debug(
-            f"采集循环启动 | 帧间隔:{actual_interval*1000:.1f}ms | "
-            f"目标FPS:{self._config.target_fps}"
+            f"采集循环启动 | 目标FPS:{target_fps} | "
+            f"目标间隔:{target_interval*1000:.1f}ms"
         )
+        
+        # FPS控制变量
+        frame_count = 0
+        fps_check_start = time.monotonic()
+        last_capture_time = 0
         
         while not self._stop_event.is_set():
             try:
@@ -531,19 +527,44 @@ class AdbSensor:
                 if self._stop_event.is_set():
                     break
                 
-                loop_start = time.monotonic()
+                # FPS控制：检查是否需要等待
+                current_time = time.monotonic()
+                elapsed_since_last = current_time - last_capture_time
                 
+                # 如果距离上次截图时间不足目标间隔，等待
+                if elapsed_since_last < target_interval:
+                    sleep_time = target_interval - elapsed_since_last
+                    time.sleep(max(sleep_time, 0.001))
+                
+                # 记录本次截图开始时间
+                capture_start = time.monotonic()
+                last_capture_time = capture_start
+                
+                # 执行截图
                 frame = self._capture_single_frame()
                 
                 if frame is not None:
                     self._process_successful_frame(frame)
                     self._consecutive_failures = 0
+                    frame_count += 1
                 else:
                     self._handle_capture_failure()
                 
-                elapsed = time.monotonic() - loop_start
-                sleep_time = max(actual_interval - elapsed, 0.001)
-                time.sleep(sleep_time)
+                # 每秒计算一次实际FPS并调整
+                fps_elapsed = time.monotonic() - fps_check_start
+                if fps_elapsed >= 1.0:
+                    actual_fps = frame_count / fps_elapsed
+                    logger.debug(f"实际FPS: {actual_fps:.1f} | 目标: {target_fps:.1f}")
+                    
+                    # 如果实际FPS远低于目标，缩短间隔
+                    if actual_fps < target_fps * 0.8:
+                        target_interval = max(target_interval * 0.9, min_interval)
+                    # 如果实际FPS接近目标，稍微放宽
+                    elif actual_fps > target_fps * 1.1:
+                        target_interval = min(target_interval * 1.05, 1.0 / target_fps * 1.5)
+                    
+                    frame_count = 0
+                    fps_check_start = time.monotonic()
                 
             except Exception as e:
                 logger.error(f"采集循环异常: {e}", exc_info=True)
@@ -554,7 +575,7 @@ class AdbSensor:
                     except Exception as cb_err:
                         logger.error(f"错误回调执行失败: {cb_err}")
                 
-                time.sleep(0.1)
+                time.sleep(0.05)
         
         logger.info("采集循环已退出")
     
