@@ -1,0 +1,268 @@
+ArknightsAutoMachine/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                      # 跨平台构建矩阵
+│   │   ├── release.yml                 # 自动化发版
+│   │   └── codeql.yml                  # 静态安全分析
+│   ├── CODE_OF_CONDUCT.md
+│   └── CONTRIBUTING.md
+│
+├── cmake/                              # CMake 工具模块
+│   ├── FindZeroMQ.cmake
+│   ├── FindCUDA.cmake
+│   ├── utils.cmake                     # 通用函数
+│   └── compiler_flags.cmake            # 跨平台编译选项
+│
+├── configs/                            # 运行时配置模板
+│   ├── ama/
+│   │   ├── capture.yaml                # L0 捕获配置（ADB/窗口句柄）
+│   │   ├── latency_budget.yaml         # 各层延迟预算
+│   │   └── input_profiles/             # 不同设备输入参数
+│   │       ├── rog_phone_8.yaml
+│   │       └── bluestacks.yaml
+│   ├── inference/
+│   │   ├── llm_providers.yaml          # OpenAI/Claude/本地模型端点
+│   │   └── prompt_templates/           # L5 提示词模板
+│   │       ├── system_expert.txt
+│   │       └── cot_format.txt
+│   └── gui/
+│       ├── qt_theme.json
+│       └── wpf_settings.json
+│
+├── core/                               # C++ AMA 核心 (L0-L4)
+│   ├── CMakeLists.txt
+│   ├── include/aam/                    # 公共接口层
+│   │   ├── core/                       # 核心抽象
+│   │   │   ├── event_bus.hpp           # 零拷贝事件总线
+│   │   │   ├── message_traits.hpp      # 类型特征萃取
+│   │   │   └── thread_pool.hpp         # 工作窃取线程池
+│   │   ├── l0/                         # 感知层接口
+│   │   │   ├── capture_backend.hpp
+│   │   │   └── frame_buffer.hpp
+│   │   ├── l1/                         # 视觉预处理接口
+│   │   │   ├── gpu_pipeline.hpp
+│   │   │   └── tensor_converter.hpp
+│   │   ├── l2/                         # 运动控制接口
+│   │   │   ├── action_executor.hpp
+│   │   │   └── human_simulator.hpp     # 贝塞尔曲线/抖动模拟
+│   │   ├── l3/                         # 战术层接口
+│   │   │   ├── tactical_engine.hpp
+│   │   │   └── dsl_compiler.hpp        # 战术 DSL 编译器
+│   │   └── l4/                         # 状态层接口
+│   │       ├── game_fsm.hpp
+│   │       └── snapshot_serializer.hpp
+│   │
+│   ├── src/                            # 实现层（严格按层隔离）
+│   │   ├── l0_sensing/                 # L0: 原始捕获
+│   │   │   ├── adb_capture.cpp         # ADB 管道读取
+│   │   │   ├── maa_adapter.cpp         # MaaFramework 桥接
+│   │   │   ├── win32_window_capture.cpp
+│   │   │   ├── shm_transport.cpp       # 共享内存传输
+│   │   │   └── tests/                  # 层内单元测试
+│   │   │       └── test_frame_sync.cpp
+│   │   │
+│   │   ├── l1_perception/              # L1: 图像处理 (GPU)
+│   │   │   ├── cuda_kernels/           # CUDA 核函数 (.cu)
+│   │   │   │   ├── color_convert.cu
+│   │   │   │   └── pyramid_down.cu
+│   │   │   ├── ocr_engine.cpp          # PaddleOCR 本地推理
+│   │   │   ├── yolo_detector.cpp       # ONNX Runtime 封装
+│   │   │   └── region_of_interest.cpp  # ROI 裁剪优化
+│   │   │
+│   │   ├── l2_motor/                   # L2: 操作执行
+│   │   │   ├── coordinate_transform.cpp # 逻辑坐标↔物理坐标
+│   │   │   ├── input_adapters/         # 多后端输入
+│   │   │   │   ├── adb_input.cpp
+│   │   │   │   ├── win32_postmessage.cpp
+│   │   │   │   └── physical_arm_stub.cpp # 机械臂预留
+│   │   │   ├── trajectory_generator.cpp # 拟人轨迹生成
+│   │   │   └── feedback_loop.cpp       # 操作确认闭环
+│   │   │
+│   │   ├── l3_tactical/                # L3: 战术执行
+│   │   │   ├── tactical_vm.cpp         # 战术字节码虚拟机
+│   │   │   ├── bytecode/               # DSL 编译产物
+│   │   │   │   ├── opcodes.hpp
+│   │   │   │   └── assembler.cpp
+│   │   │   ├── cost_manager.cpp        # 费用计算
+│   │   │   └── collision_predictor.cpp # 碰撞检测
+│   │   │
+│   │   ├── l4_state/                   # L4: 状态机与存档
+│   │   │   ├── hfsm_impl.cpp           # 分层状态机实现
+│   │   │   ├── sqlite_storage.cpp      # 本地存储
+│   │   │   ├── delta_encoder.cpp       # 增量快照压缩
+│   │   │   └── prts_data_loader.cpp    # 关卡数据加载
+│   │   │
+│   │   └── common/                     # 基础设施
+│   │       ├── logger.cpp              # spdlog 封装
+│   │       ├── timer.cpp               # 高精度计时
+│   │       └── memory_pool.cpp         # 定长内存池
+│   │
+│   └── tests/                          # C++ 集成测试
+│       ├── integration/                # 跨层集成
+│       │   └── test_l0_to_l2_pipeline.cpp
+│       └── benchmarks/                 # 性能基准
+│           └── benchmark_capture_latency.cpp
+│
+├── bridge/                             # C++ ↔ Python 桥接层
+│   ├── CMakeLists.txt
+│   ├── include/aam_bridge/
+│   │   ├── ipc_client.hpp              # gRPC/SHM 客户端
+│   │   ├── pybind_adapter.hpp          # pybind11 封装（调试模式）
+│   │   └── transport_factory.hpp
+│   ├── src/
+│   │   ├── grpc_client.cpp             # C++ gRPC 客户端
+│   │   ├── shm_segment.cpp             # Boost.Interprocess 封装
+│   │   └── pybind_module.cpp           # Python 可调用的 C++ API
+│   └── python/                         # Python 侧桥接
+│       └── aam_bridge/
+│           ├── __init__.py
+│           └── native_client.py        # 调用 C++ 共享库
+│
+├── gui/                                # 多前端实现
+│   ├── abstract/                       # GUI 抽象层（纯 C++）
+│   │   ├── include/aam_gui/
+│   │   │   ├── i_main_window.hpp
+│   │   │   ├── i_map_canvas.hpp
+│   │   │   └── i_control_panel.hpp
+│   │   └── src/
+│   │       └── event_dispatcher.cpp
+│   │
+│   ├── qt/                             # Qt6 实现（跨平台主推）
+│   │   ├── CMakeLists.txt
+│   │   ├── src/
+│   │   │   ├── main_window.cpp
+│   │   │   ├── map_view.cpp            # OpenGL 地图渲染
+│   │   │   ├── operator_palette.cpp    # 干员栏 UI
+│   │   │   └── qt_event_bridge.cpp     # 信号槽↔AMA事件桥接
+│   │   ├── resources/
+│   │   │   ├── qml/                    # 可选 QML 组件
+│   │   │   └── icons/
+│   │   └── tests/
+│   │
+│   └── wpf/                            # WPF 实现（Windows 高级）
+│       ├── AAM.WPF/                    # C# 主项目
+│       │   ├── Views/
+│       │   │   ├── MainWindow.xaml
+│       │   │   └── MapOverlay.xaml     # 悬浮地图层
+│       │   ├── ViewModels/               # MVVM 模式
+│       │   └── App.xaml
+│       └── AAM.Native/                 # C++/CLI 桥接工程
+│           ├── include/
+│           └── src/
+│               ├── cpp_cli_bridge.cpp  # 托管/非托管边界
+│               └── frame_pusher.cpp    # 零拷贝帧传递
+│
+├── inference/                          # Python 推理后端 (L5)
+│   ├── pyproject.toml                  # Poetry 配置，依赖锁定
+│   ├── poetry.lock
+│   ├── README.md                       # Python 后端独立文档
+│   │
+│   ├── src/
+│   │   ├── __main__.py                 # 服务入口：启动 gRPC/WS
+│   │   │
+│   │   ├── data/                       # 数据层（你现有的）
+│   │   │   ├── __init__.py
+│   │   │   ├── cache/                  # 本地文件缓存
+│   │   │   │   ├── image_cache.py
+│   │   │   │   └── model_weights/
+│   │   │   ├── database/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── manager.py          # SQLite/Redis 管理
+│   │   │   │   └── schema.py           # SQLAlchemy/Pydantic 模型
+│   │   │   ├── models/                 # 领域模型（你现有的）
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── base.py             # 基类与工厂
+│   │   │   │   ├── enemy.py
+│   │   │   │   ├── item.py
+│   │   │   │   ├── operator.py
+│   │   │   │   └── stage.py
+│   │   │   ├── operator_matcher.py     # 干员匹配逻辑
+│   │   │   └── providers/              # 数据源适配器
+│   │   │       ├── __init__.py
+│   │   │       ├── data_manager.py     # 统一数据门面
+│   │   │       ├── github_provider.py  # GitHub 原始数据
+│   │   │       └── prts_provider.py    # PRTS Wiki 爬取
+│   │   │
+│   │   ├── map/                        # 地图分析（你现有的）
+│   │   │   ├── __init__.py
+│   │   │   ├── level_analyzer.py       # 关卡难度评估
+│   │   │   └── map_visualizer.py       # 地图生成可视化
+│   │   │
+│   │   └── vision/                     # 高层视觉分析（你现有的）
+│   │       ├── __init__.py
+│   │       ├── enhanced_gui_matcher.py # 增强版 GUI 匹配
+│   │       ├── game_state_detector.py  # 游戏状态机识别
+│   │       ├── gui_matcher.py          # 基础 GUI 元素匹配
+│   │       ├── squad_analyzer.py        # 编队分析
+│   │       ├── squad_recognizer.py      # 干员识别（接 C++ L1）
+│   │       └── text_locator.py          # 文本定位
+│   │
+│   ├── services/                       # 服务化封装（新增）
+│   │   ├── grpc_server.py              # gRPC 服务实现（L4↔L5）
+│   │   ├── websocket_server.py         # WebSocket 实时流
+│   │   ├── l5_controller.py            # L5 决策主循环
+│   │   └── llm_adapters/               # 多模型适配
+│   │       ├── openai_adapter.py
+│   │       ├── claude_adapter.py
+│   │       └── local_llava.py
+│   │
+│   ├── models/                         # AI 模型定义与微调
+│   │   ├── checkpoints/                # 本地模型权重（git-lfs）
+│   │   ├── training/                   # 训练脚本
+│   │   │   ├── fine_tune_yolo.py
+│   │   │   └── distill_llm.py          # 知识蒸馏
+│   │   └── eval/                       # 模型评估
+│   │
+│   └── tests/                          # Python 测试
+│       ├── unit/                       # 单元测试
+│       │   ├── test_data_manager.py
+│       │   └── test_vision_matcher.py
+│       └── integration/                # 与 C++ 集成测试
+│           └── test_grpc_bridge.py
+│
+├── proto/                              # 协议定义（唯一真相源）
+│   ├── common/
+│   │   └── types.proto                 # 坐标/时间戳/枚举定义
+│   ├── ama/
+│   │   ├── l0_frame.proto              # H264元数据/YUV描述符
+│   │   ├── l1_perception.proto         # 目标检测框/OCR结果
+│   │   ├── l2_action.proto           # 点击/滑动/延时指令
+│   │   ├── l3_tactical.proto           # 战术原语序列
+│   │   ├── l4_state.proto              # 完整游戏快照
+│   │   └── l4_query.proto              # 状态查询接口
+│   ├── inference/
+│   │   ├── l5_strategy.proto           # LLM 输入/输出
+│   │   └── llm_stream.proto            # 流式推理
+│   └── services/
+│       ├── control_service.proto       # 主控制服务
+│       └── debug_service.proto         # 远程调试接口
+│
+├── scripts/                            # 工程脚本
+│   ├── codegen/
+│   │   ├── protobuf_gen.py             # 生成 C++/Python 代码
+│   │   └── version_bump.py             # 版本号管理
+│   ├── setup/
+│   │   ├── install_deps_windows.ps1
+│   │   └── setup_vcpkg.sh
+│   └── db_migrate/                     # 关卡数据库迁移
+│       └── fetch_prts_data.py
+│
+├── tests/                              # 端到端测试（黑盒）
+│   ├── e2e/
+│   │   ├── test_1_7_clear.py           # 1-7 通关全流程
+│   │   └── test_crisis_contract.py     # 危机合约测试
+│   └── fixtures/                       # 测试数据
+│       ├── screenshots/
+│       └── recordings/
+│
+├── third_party/                        # 外部依赖（子模块或下载）
+│   ├── vcpkg/                          # C++ 包管理（可选子模块）
+│   ├── maafw/                          # MaaFramework 适配层
+│   └── onnxruntime/                    # 推理引擎
+│
+├── .clang-format                       # C++ 代码风格
+├── .clang-tidy                         # C++ 静态检查规则
+├── .gitignore
+├── CMakeLists.txt                      # 根 CMake，管理 core/ bridge/ gui/
+├── LICENSE                             # AGPL-3.0
+└── README.md                           # 项目主文档
