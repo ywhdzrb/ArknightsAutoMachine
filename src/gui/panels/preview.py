@@ -706,7 +706,7 @@ class PreviewPanel(ttk.LabelFrame):
 
             # 获取分辨率和裁剪信息，用于点击坐标映射
             # 优先使用 bridge 的传感器分辨率（与 ADB 操作分辨率一致）
-            if self._bridge:
+            if self._bridge and hasattr(self._bridge, 'get_sensor_resolution'):
                 sensor_resolution = self._bridge.get_sensor_resolution()
             else:
                 sensor_resolution = metadata.get('original_resolution', metadata.get('resolution', (0, 0)))

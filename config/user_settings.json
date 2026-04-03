@@ -1,6 +1,6 @@
 {
     "adb": {
-        "executable_path": "E:/MuMu Player 12/nx_device/12.0/shell/adb.exe",
+        "executable_path": "D:\\platform-tools\\adb.exe",
         "timeout_seconds": 30,
         "auto_reconnect": true,
         "health_check_interval": 10,

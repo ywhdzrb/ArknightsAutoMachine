@@ -32,6 +32,7 @@ config/*.local.json
 # ==================== 虚拟环境 ====================
 # Python 虚拟环境
 venv/
+venv*/
 env/
 ENV/
 .venv/
@@ -148,3 +149,4 @@ docs/api/
 *.db
 *.sqlite
 *.sqlite3
+config/user_settings.json

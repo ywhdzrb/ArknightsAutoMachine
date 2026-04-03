@@ -16,11 +16,11 @@ Pillow>=10.0.0,<11.0.0
 # Windows 系统通常自带，Linux 需安装: sudo apt-get install python3-tk
 
 # ==================== ADB 设备通信 ====================
-adbutils==0.11.0
+adbutils>=1.0.8,<2.0.0
 
 # ==================== Scrcpy 视频流捕获 ====================
-scrcpy-client>=0.4.8,<0.5.0
-av>=11.0.0,<13.0.0  # PyAV，scrcpy-client 的解码依赖
+# scrcpy-client>=0.4.7,<0.5.0  # 可能需要手动安装：pip install scrcpy-client==0.4.7 --no-deps
+av>=12.0.0,<13.0.0  # PyAV，视频解码
 
 # ==================== 配置文件解析 ====================
 PyYAML>=6.0,<7.0
