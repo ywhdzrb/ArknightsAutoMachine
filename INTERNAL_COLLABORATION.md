@@ -14,7 +14,7 @@
 |-----------|----------|--------|------------|
 | **@dhjs0000** | 项目Owner & C++架构师 | C++23/WPF/CMake | `core/`, `bridge/`, `gui/wpf/`, `proto/` |
 | **@error-0x12** | Python推理后端负责人 | Python/OpenCV/ONNX/gRPC | `inference/`, `models/` |
-| **@ywhdzrb** | Linux GUI开发 | Qt5/python | `gui/qt/`, `configs/gui/` |
+| **@ywhdzrb** | Linux GUI开发 | PyQt6/python | `gui/qt/`, `configs/gui/`, `bridge/python/aam_bridge/` |
 
 ### 1.2 辅助贡献者 (Contributor)
 | GitHub ID | 职责范围 | 工作性质 | 交付物 |
@@ -41,7 +41,7 @@
 
 ### v0.9.0-beta ~ v1.0.0-rc (GUI与生产化)
 - **@dhjs0000**: **R/A** - WPF原型（Windows专业版）
-- **@ywhdzrb**: **R/A** - Qt6主实现（跨平台主推）
+- **@ywhdzrb**: **R/A** - PyQt6主实现（跨平台主推）
 - **@error-0x12**: **C** - 提供性能监控接口给GUI
 - **@OFFMN-SHARP [OPT]**: 准备`tests/fixtures/`测试截图数据（可选，不阻塞）
 
@@ -140,8 +140,9 @@ Footer: (关联Issue，可选)
 
 # GUI - 分平台审查
 /gui/qt/          @ywhdzrb @dhjs0000
-/gui/wpf/         @dhjs000000
+/gui/wpf/         @dhjs0000
 /gui/abstract/    @dhjs0000 @ywhdzrb
+/bridge/python/aam_bridge/  @ywhdzrb @dhjs0000
 
 # 可选工作 - 单Reviewer即可
 /docs/            @dhjs0000 @OFFMN-SHARP

@@ -1,8 +1,21 @@
-# qt - Qt6 实现
+# qt - PyQt6 实现
 
 ## 目录说明
 
 本目录包含基于 PyQt6 的跨平台 GUI 实现，是 AAM 的主要 GUI 方案。
+
+## 许可证兼容性说明
+
+### PyQt6 与 AGPL-3.0
+
+本项目采用 AGPL-3.0 许可证。PyQt6 采用 GPL 许可证，与 AGPL-3.0 兼容：
+
+- **GPL 兼容性**: AGPL-3.0 是 GPL-3.0 的扩展版本，两者完全兼容
+- **网络条款**: AGPL-3.0 额外要求通过网络提供服务时也需提供源代码
+- **使用建议**: 
+  - 商业使用需注意 GPL/AGPL 的传染性
+  - 如需闭源商业使用，可考虑购买 Riverbank Computing 的商业许可证
+  - 更多信息: https://www.riverbankcomputing.com/commercial/license-faq
 
 ## 技术栈
 
@@ -16,15 +29,12 @@
 ```
 gui/qt/
 ├── src/
-│   ├── main_window.py        # 主窗口实现
-│   ├── map_view.py           # 截屏地图视图
-│   ├── operator_palette.py   # 干员面板
-│   └── qt_event_bridge.py    # Qt 信号槽 ↔ AAM 事件桥接
-├── resources/
-│   ├── qml/                  # QML 组件（可选）
-│   └── icons/                # 图标资源
-├── tests/
-└── requirements.txt
+│   ├── mainwindows.py        # 主窗口实现
+│   ├── screen_view.py        # 投屏视图组件
+│   ├── scrcpy_client.py      # scrcpy 客户端（重导出）
+│   └── __init__.py           # 模块模块初始化
+├── requirements.txt          # Python 依赖
+└── README.md                 # 本文档
 ```
 
 ## 主窗口
@@ -53,18 +63,16 @@ gui/qt/
 
 ### 代码示例
 ```python
-# src/main_window.py
+# src/mainwindows.py
 from PyQt6.QtWidgets import QMainWindow
-from .map_view import MapView
-from .operator_palette import OperatorPalette
-from .log_panel import LogPanel
+from .screen_view import ScreenView
+from bridge.python.aam_bridge import ScrcpyClient
 
 class MainWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, screen_client=None, parent=None):
         super().__init__(parent)
-        self.map_view = MapView(self)
-        self.operator_palette = OperatorPalette(self)
-        self.log_panel = LogPanel(self)
+        # 使用依赖注入的客户端
+        self.screen_view = ScreenView(client=screen_client)
         self._setup_ui()
     
     def _setup_ui(self):
@@ -74,56 +82,38 @@ class MainWindow(QMainWindow):
     def set_title(self, title: str):
         self.setWindowTitle(title)
     
-    def map_canvas(self) -> 'MapView':
-        return self.map_view
+    def set_status(self, message: str):
+        self.statusBar().showMessage(message)
 ```
 
-## 地图视图
+## 投屏视图
 
-### 截屏显示
+### 帧渲染
 ```python
-# src/map_view.py
+# src/screen_view.py
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPixmap, QPainter
-from PyQt6.QtCore import Qt
-import cv2
+from PyQt6.QtGui import QPixmap, QPainter, QImage
+from PyQt6.QtCore import Qt, pyqtSignal
 import numpy as np
 
-class MapView(QWidget):
-    def __init__(self, parent=None):
+class ScreenView(QWidget):
+    # 使用 QImage 信号避免主线程处理 numpy 数组
+    frame_ready = pyqtSignal(QImage)
+    
+    def __init__(self, client=None, parent=None):
         super().__init__(parent)
-        self.current_frame = QPixmap()
-        self.setMinimumSize(640, 480)
+        self._client = client  # 依赖注入
+        self._setup_ui()
     
-    def render_frame(self, frame: np.ndarray):
-        """渲染截屏帧"""
-        # OpenCV BGR -> RGB
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb_frame.shape
-        # 转换为 QPixmap
-        from PyQt6.QtGui import QImage
-        q_img = QImage(rgb_frame.data, w, h, ch * w, QImage.Format.Format_RGB888)
-        self.current_frame = QPixmap.fromImage(q_img)
-        self.update()
-    
-    def draw_detection(self, detection: dict):
-        """绘制检测结果"""
-        # 在帧上绘制检测框
-        pass
-    
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        if not self.current_frame.isNull():
-            # 缩放以适应窗口
-            scaled = self.current_frame.scaled(
-                self.size(), 
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            # 居中绘制
-            x = (self.width() - scaled.width()) // 2
-            y = (self.height() - scaled.height()) // 2
-            painter.drawPixmap(x, y, scaled)
+    def _on_frame_received(self, frame: np.ndarray):
+        """帧接收回调，转换为 QImage"""
+        h, w, ch = frame.shape
+        rgb_frame = np.ascontiguousarray(frame[:, :, ::-1])
+        q_image = QImage(
+            rgb_frame.data, w, h, ch * w, 
+            QImage.Format.Format_RGB888
+        ).copy()
+        self.frame_ready.emit(q_image)
 ```
 
 ## 事件桥接
@@ -168,7 +158,7 @@ class QtEventBridge(QObject):
 pip install -r requirements.txt
 
 # 运行
-python -m gui.qt.main
+python -m gui.run_qt
 ```
 
 ## 主题支持
@@ -199,7 +189,40 @@ dark_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
 app.setPalette(dark_palette)
 ```
 
+## 架构设计
+
+### 依赖注入
+
+GUI 层通过依赖注入接收投屏客户端实例：
+
+```python
+from bridge.python.aam_bridge import ScrcpyClient, ScrcpyConfig
+from gui.qt.src import MainWindow
+
+# 创建配置
+config = ScrcpyConfig(
+    max_size=1920,
+    bit_rate=8000000,
+    max_fps=60
+)
+
+# 创建客户端
+client = ScrcpyClient(config)
+
+# 注入到主窗口
+window = MainWindow(screen_client=client)
+```
+
+### 抽象接口
+
+所有 GUI 组件都依赖 `gui.abstract` 中定义的抽象接口：
+
+- `IMainWindow`: 主窗口接口
+- `IScreenView`: 投屏视图接口
+- `IScreenMirrorClient`: 投屏客户端接口
+
 ## 相关目录
 
 - [gui/abstract/](../abstract/): 抽象接口
+- [bridge/python/aam_bridge/](../../bridge/python/aam_bridge/): 投屏客户端实现
 - [gui/wpf/](../wpf/): WPF 实现
