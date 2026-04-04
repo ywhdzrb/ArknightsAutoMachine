@@ -34,14 +34,14 @@
 ### v0.1.0-alpha.1：协议定义
 
 **协议层 (`proto/`)**
-- [ ] `proto/common/types.proto`：基础类型定义
-- [ ] `proto/ama/l0_frame.proto`：L0 帧元数据
-- [ ] `proto/ama/l1_perception.proto`：L1 感知结果
-- [ ] `proto/ama/l2_action.proto`：L2 动作指令
-- [ ] `proto/ama/l3_tactical.proto`：L3 战术原语
-- [ ] `proto/ama/l4_state.proto`：L4 状态快照
-- [ ] `proto/inference/l5_strategy.proto`：L5 决策接口
-- [ ] `proto/services/control_service.proto`：控制服务 RPC
+- [x] `proto/common/types.proto`：基础类型定义
+- [x] `proto/ama/l0_frame.proto`：L0 帧元数据
+- [x] `proto/ama/l1_perception.proto`：L1 感知结果
+- [x] `proto/ama/l2_action.proto`：L2 动作指令
+- [x] `proto/ama/l3_tactical.proto`：L3 战术原语
+- [x] `proto/ama/l4_state.proto`：L4 状态快照
+- [x] `proto/inference/l5_strategy.proto`：L5 决策接口
+- [x] `proto/services/control_service.proto`：控制服务 RPC
 
 ### v0.1.0-alpha.2：构建系统
 
