@@ -1,3 +1,4 @@
+$script:vcpkgPath = "C:\Dev\vcpkg"
 function Install-WingetDepsSoftware {
     $softwareList = @(
         "Microsoft.VisualStudio.2022.BuildTools",
@@ -17,7 +18,7 @@ function Install-WingetDepsSoftware {
     }
 }
 function Get-VcpkgRepository {
-    $vcpkgPath = "C:\Dev\vcpkg"
+    $vcpkgPath =$script:vcpkgPath
     if (Test-Path $vcpkgPath) {
         Write-Output "vcpkg is already cloned."
     } else {
@@ -26,7 +27,7 @@ function Get-VcpkgRepository {
     }
 }
 function Install-VCPKG {
-    $vcpkgPath = "C:\Dev\vcpkg"
+    $vcpkgPath = $script:vcpkgPath
     if (Test-Path "$vcpkgPath\vcpkg.exe") {
         Write-Output "vcpkg is already installed."
     } else {
@@ -52,7 +53,8 @@ function Get-Admin{
     }
 }
 function  Install-Poetry {
-    while ($true) {
+    $MaxWhileAttempts = 5
+    while ($MaxWhileAttempts > 0) {
         Write-Output "Checking if Poetry is installed..."
         try {
             poetry --version | Out-Null
@@ -60,24 +62,25 @@ function  Install-Poetry {
             break
         }
         catch {
+            $MaxWhileAttempts--
             Write-Output "Poetry is not installed. Installing..."
             python.exe -m pip install  poetry
         }
     }
 }
 try {
-    Get-Admin
     winget --version | Out-Null
-    Write-Output "Winget is already installed."
-    Install-WingetDepsSoftware
-    Get-VcpkgRepository
-    Install-VCPKG
-    & "$vcpkgPath\vcpkg.exe" integrate install
-    Install-VCPKG-Dependency
-    Install-Poetry
+    Write-Output "Winget is available."
 }
 catch {
     Write-Output "Winget is not installed."
     Write-Output "Please install Winget from the Microsoft Store and run this script again."
     Pause
+    exit 1
 }
+Install-WingetDepsSoftware
+Get-VcpkgRepository
+Install-VCPKG
+& "$script:vcpkgPath\vcpkg.exe" integrate install
+Install-VCPKG-Dependency
+Install-Poetry
