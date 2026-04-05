@@ -141,7 +141,7 @@ jobs:
           }
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v12
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgJsonGlob: 'vcpkg.json'
@@ -227,7 +227,7 @@ jobs:
             libzmq3-dev
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
@@ -296,7 +296,7 @@ jobs:
             zeromq
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
