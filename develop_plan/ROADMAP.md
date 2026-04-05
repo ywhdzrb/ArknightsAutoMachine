@@ -81,8 +81,8 @@
 
 ### v0.2.0-alpha.1：接口定义
 
-- [ ] `include/aam/l0/capture_backend.hpp`：`ICaptureBackend` 接口
-- [ ] `include/aam/l0/frame_buffer.hpp`：`LockFreeFrameBuffer<T>` 模板
+- [x] `include/aam/l0/capture_backend.hpp`：`ICaptureBackend` 接口
+- [x] `include/aam/l0/frame_buffer.hpp`：`LockFreeFrameBuffer<T>` 模板
 
 ### v0.2.0-alpha.2：捕获后端
 
