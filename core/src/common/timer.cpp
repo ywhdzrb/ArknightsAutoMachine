@@ -40,6 +40,7 @@ namespace aam::core {
 LatencyHistogram::LatencyHistogram(std::size_t bucket_count, std::int64_t max_latency_ns)
     : bucket_count_(bucket_count)
     , max_latency_ns_(max_latency_ns)
+    , log_max_latency_(std::log10(static_cast<double>(max_latency_ns)))
     , buckets_(bucket_count) {
     for (auto& bucket : buckets_) {
         bucket.store(0, std::memory_order_relaxed);
@@ -76,8 +77,9 @@ void LatencyHistogram::record_ns(std::int64_t latency_ns) {
     std::size_t bucket_idx = 0;
     if (latency_ns > 0) {
         // 使用对数分布：0-1us, 1-10us, 10-100us, ...
+        // 使用缓存的 log_max_latency_ 避免重复计算
         double log_val = std::log10(static_cast<double>(latency_ns));
-        bucket_idx = static_cast<std::size_t>((log_val / std::log10(static_cast<double>(max_latency_ns_))) * bucket_count_);
+        bucket_idx = static_cast<std::size_t>((log_val / log_max_latency_) * bucket_count_);
         bucket_idx = std::min(bucket_idx, bucket_count_ - 1);
     }
 

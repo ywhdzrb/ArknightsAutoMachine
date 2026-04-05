@@ -559,6 +559,7 @@ public:
 private:
     std::size_t bucket_count_;
     std::int64_t max_latency_ns_;
+    double log_max_latency_;  ///< 缓存的 log10(max_latency_ns_)，避免重复计算
     std::vector<std::atomic<std::uint64_t>> buckets_;
     std::atomic<std::uint64_t> total_count_{0};
     std::atomic<std::int64_t> sum_latency_{0};

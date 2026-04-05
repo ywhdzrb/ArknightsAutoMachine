@@ -154,8 +154,10 @@ void* FixedMemoryPool::allocate() {
                 }
             }
 
-            // 清零内存（安全考虑）
+            // 清零内存（仅在调试模式下启用，避免影响性能）
+            #ifndef NDEBUG
             std::memset(head, 0, block_size_);
+            #endif
 
             return head;
         }

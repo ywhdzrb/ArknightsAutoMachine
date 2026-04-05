@@ -50,7 +50,6 @@ namespace aam::l0 {
 enum class BufferPolicy : std::uint8_t {
     DropOldest,     ///< 丢弃最旧的帧
     DropNewest,     ///< 丢弃最新的帧（即拒绝写入）
-    Block,          ///< 阻塞等待（仅适用于阻塞式缓冲区）
     Overwrite,      ///< 直接覆盖（可能导致读取到不完整帧）
 };
 
@@ -561,10 +560,6 @@ private:
                 return true;
             }
 
-            case BufferPolicy::Block:
-                // 无锁缓冲区不支持阻塞
-                dropped_frames_.fetch_add(1, std::memory_order_relaxed);
-                return false;
         }
 
         return false;
@@ -848,8 +843,6 @@ private:
                 return true;
             }
 
-            case BufferPolicy::Block:
-                return false;
         }
         return false;
     }
