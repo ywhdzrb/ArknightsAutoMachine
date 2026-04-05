@@ -102,6 +102,10 @@ jobs:
             ninja-build \
             cmake \
             pkg-config \
+            autoconf \
+            autoconf-archive \
+            automake \
+            libtool \
             g++-12 \
             libopencv-dev \
             libeigen3-dev \
@@ -116,7 +120,7 @@ jobs:
             libzmq3-dev
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'

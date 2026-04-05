@@ -63,7 +63,7 @@ jobs:
       - name: Run clang-format
         uses: jidicula/clang-format-action@v4.11.0
         with:
-          clang-format-version: '17'
+          clang-format-version: '21'
           check-path: 'core'
           fallback-style: 'LLVM'
 
@@ -71,7 +71,7 @@ jobs:
       # - name: Run clang-format on bridge
       #   uses: jidicula/clang-format-action@v4.11.0
       #   with:
-      #     clang-format-version: '17'
+      #     clang-format-version: '21'
       #     check-path: 'bridge'
       #     fallback-style: 'LLVM'
 
@@ -141,7 +141,7 @@ jobs:
           }
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v12
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgJsonGlob: 'vcpkg.json'
@@ -213,6 +213,10 @@ jobs:
             ninja-build \
             cmake \
             pkg-config \
+            autoconf \
+            autoconf-archive \
+            automake \
+            libtool \
             ${{ matrix.compiler == 'gcc-12' && 'g++-12' || 'clang-16' }} \
             libopencv-dev \
             libeigen3-dev \
@@ -227,7 +231,7 @@ jobs:
             libzmq3-dev
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
@@ -296,7 +300,7 @@ jobs:
             zeromq
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@v11.5
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
